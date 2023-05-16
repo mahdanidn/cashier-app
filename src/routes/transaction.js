@@ -4,7 +4,7 @@ const TransactionController = require("../controller/transaction");
 
 const routerTransaction = express.Router();
 
-// CREATE DATA PRODUCT
+// CREATE TRANSACTION PRODUCT
 routerTransaction.post("/", TransactionController.createNewTransaction);
 
 // GET DATA PRODUCTS
