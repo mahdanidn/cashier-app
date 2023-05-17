@@ -1,36 +1,59 @@
 const dbPool = require("../config/database");
 
+class CustomError extends Error {
+  constructor(message, statusCode) {
+    super(message);
+    this.messageRespon =
+      "Terdapat menu yang tidak di temukan, harap hubungi developer";
+    this.statusCode = statusCode;
+  }
+}
+
 const createNewTransaction = (body) => {
   const { transaction, transaction_detail } = body;
   /**
-   * 1. Periksa ketersediaan stock
+   * 1. Periksa product yang di kirimkan ada atau tidak
+   * 2. Ketika product ditemukan maka kurangi stock nya lalu UPDATE query product nya
+   * 3. Hitung total jumlah menu yang di pesan lalu masukkan ke dalam table transaction
+   * 4. Lalu masukkan semua menu kalikan dengan jumlah quantity yang di pesan dan masukkan datanya ke dalam table transaction_detail
    */
-  // console.log(body);
 
   return dbPool
     .getConnection()
     .then((connection) => {
       return connection
         .beginTransaction()
-        .then(() => {
-          const promises = transaction_detail.map(async (value, index) => {
+        .then(async () => {
+          const promises = [];
+
+          for (let value of transaction_detail) {
+            ``;
             let stok = `SELECT * FROM products WHERE id = ${value.id_product}`;
             const [results] = await connection.execute(stok);
+
             if (results.length === 0) {
-              throw new Error(
+              connection.rollback();
+              const error = new CustomError(
                 `Product with id ${value.id_product} does not exist`
               );
+              error.statusCode = 400;
+              throw error;
             }
+
             const { stock } = results[0];
             let sisaStock = stock - value.quantity;
-            if (sisaStock < 0) {
+
+            if (sisaStock <= 0) {
+              connection.rollback();
               throw new Error(
                 `Insufficient stock for product with id ${value.id_product}`
               );
             }
+
             let updateQuery = `UPDATE products SET stock = ${sisaStock} WHERE id = ${value.id_product}`;
-            return await connection.execute(updateQuery);
-          });
+            promises.push(connection.execute(updateQuery));
+          }
+
           return Promise.all(promises)
             .then(() => {
               return connection.commit();
@@ -49,7 +72,13 @@ const createNewTransaction = (body) => {
       // INSERT INTO transaction_detail
     })
     .catch((error) => {
-      console.error(error);
+      console.error("throw erro", error);
+      const errorMessage = {
+        statusCode: 400,
+        messageRespon: error.messageRespon,
+        message: error.message,
+      };
+      return errorMessage;
       // Handle error or rollback specific to your application's needs
     });
 

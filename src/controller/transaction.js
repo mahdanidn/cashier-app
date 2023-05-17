@@ -5,6 +5,7 @@ const createNewTransaction = async (req, res) => {
 
   try {
     const result = await TransactionModel.createNewTransaction(body);
+    console.log("result :", result);
     res.status(200).json({
       message: "Create Transaction Success",
       result,
