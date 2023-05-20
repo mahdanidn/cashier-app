@@ -1,10 +1,9 @@
 const dbPool = require("../config/database");
 
 class CustomError extends Error {
-  constructor(message, statusCode) {
+  constructor(message, statusCode, messageRespon) {
     super(message);
-    this.messageRespon =
-      "Terdapat menu yang tidak di temukan, harap hubungi developer";
+    this.messageRespon = messageRespon;
     this.statusCode = statusCode;
   }
 }
@@ -34,9 +33,10 @@ const createNewTransaction = (body) => {
             if (results.length === 0) {
               connection.rollback();
               const error = new CustomError(
-                `Product with id ${value.id_product} does not exist`
+                `Product with id ${value.id_product} does not exist`,
+                400,
+                "Terdapat menu yang tidak di temukan, harap hubungi developer"
               );
-              error.statusCode = 400;
               throw error;
             }
 
@@ -70,38 +70,45 @@ const createNewTransaction = (body) => {
     .then(() => {
       // Transaction successful
       // INSERT INTO transaction_detail
+
+      const SQLTransaction = `INSERT INTO transaksi (invoice_id, total_harga, total_seluruh)
+        VALUES("${transaction.invoice_id}", ${transaction.total_harga}, ${transaction.total_seluruh})
+      `;
+
+      return dbPool
+        .execute(SQLTransaction)
+        .then(() => {
+          let SQLTransactionDetail = `INSERT INTO transaksi_detail (invoice_id, id_product, harga, quantity, total_harga) VALUES `;
+          let values = [];
+
+          transaction_detail.forEach((transaction, index) => {
+            values.push(
+              `("${transaction.invoice_id}", ${transaction.id_product}, ${transaction.harga}, ${transaction.quantity}, ${transaction.total_harga})`
+            );
+          });
+
+          SQLTransactionDetail += values.join(", ");
+
+          return dbPool.execute(SQLTransactionDetail);
+        })
+        .catch((error) => {
+          console.log(error.message);
+          const errorCostume = new CustomError(
+            error.message,
+            400,
+            "Gagal menambahkan data transaksi"
+          );
+          throw errorCostume;
+        });
     })
     .catch((error) => {
-      console.error("throw erro", error);
       const errorMessage = {
         statusCode: 400,
         messageRespon: error.messageRespon,
         message: error.message,
       };
       return errorMessage;
-      // Handle error or rollback specific to your application's needs
     });
-
-  // let SQLTransactionDetail = `INSERT INTO transaksi_detail (invoice_id, id_product, harga, quantity, total_harga) VALUES `;
-  // let values = [];
-
-  // body.forEach((transaction, index) => {
-  //   values.push(
-  //     `("${transaction.invoice_id}", ${transaction.id_product}, ${transaction.harga}, ${transaction.quantity}, ${transaction.total_harga})`
-  //   );
-  // });
-
-  // SQLTransactionDetail += values.join(", ");
-
-  // const SQLTransactionDetail = `INSERT INTO transaksi_detail (invoice_id, id_product, harga, quantity, total_harga)
-  // VALUES (1, 3, 12000, 4, 48000),
-  // 	(1, 1, 12000, 3, 36000);`;
-
-  // const SQLTransaction = `INSERT INTO transaksi (invoice_id, total_harga, total_seluruh)
-  //   VALUES("INV17022023", 100000, 111000)
-  // `;
-
-  // return dbPool.execute(SQLTransactionDetail);
 };
 
 module.exports = {
